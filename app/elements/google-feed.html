@@ -1,0 +1,202 @@
+<link rel="import" href="../bower_components/polymer/polymer.html">
+<link rel="import" href="../bower_components/google-apis/google-jsapi.html">
+
+<!--
+Dynamically loads the Google Feeds API and grabs a given RSS `url` or a plaintext `query` from the API.
+
+The given feed or query response is then reflected back up to the parent element for display through the
+`feedResponse` or `queryResponse` object for visual display. Note that this element is non-visual and
+does not display anything.
+
+@element google-feed
+-->
+<polymer-element name="google-feed" attributes="url numEntries format historicalEntries query feedResponse queryResponse">
+    <template>
+        <google-jsapi on-core-shared-lib-load={{this.apiLoad}} url="https://www.google.com/jsapi?callback=%%callback%%"></google-jsapi>
+    </template>
+    <script>
+        Polymer('google-feed', {
+            /*
+             * NOTE: By default, all parameters are set from
+             * above and do not reflect back up to their parent
+             * components. The only exceptions are feedResponse
+             * and queryResponse, which are used by parent visual
+             * components.
+             */
+
+            // The URL of the feed you'd like to read.
+            // Needs to be passed into the component.
+            url: null,
+
+            urlChanged: function() {
+                'use strict';
+
+                this.feedsLoad();
+            },
+
+            // The feed object we create from Google's API.
+            feed: null,
+
+            // Our callback for when we get a response from
+            // the Google Feeds API for a specific RSS feed.
+            onFeedResponse: function(response) {
+                'use strict';
+
+                this.feedResponse = response;
+            },
+
+            // The response object we get back for a feed
+            // from the Google Feeds API. This is reflected
+            // back up to parent elements for visual display.
+            feedResponse: {
+                value: null,
+                reflect: true
+            },
+
+            // The number of RSS entries we wish to grab.
+            numEntries: 10,
+
+            // The format we want the response to be in.
+            // Can be 'json', 'xml', or 'mixed'.
+            format: 'json',
+
+            // Whether we want Google to grab additional
+            // entries that are no longer available on the
+            // feed itself.
+            historicalEntries: false,
+
+            // The query we'd like to search for. This
+            // needs to be passed into the component.
+            query: null,
+
+            queryChanged: function() {
+                'use strict';
+
+                this.feedsLoad();
+            },
+
+            // Our callback for when we get a response from
+            // the Google Feeds API for a given query.
+            onQueryResponse: function(response) {
+                'use strict';
+
+                this.queryResponse = response;
+            },
+
+            // The response object we get back for a query
+            // from the Google Feeds API. This is reflected
+            // back up to parent elements for visual display.
+            queryResponse: {
+                value: null,
+                reflect: true
+            },
+
+            // Polymer life-cycle callback. see
+            // http://www.polymer-project.org/docs/polymer/polymer.html#lifecyclemethods
+            // for more info.
+            ready: function() {
+                'use strict';
+
+                document.addEventListener('api-load', this.apiLoad.bind(this));
+            },
+
+            // Callback for when the initial Google JSAPI
+            // code loads. This still needs to load the specific
+            // Feeds API.
+            //
+            // Ideally this should be part of the google-jsapi
+            // element, where for example you could pass an
+            // attribute in with a string delimited list of
+            // sub-APIs you'd want to load.
+            //
+            // However that was a component I reused from elsewhere
+            // and I haven't gotten around to making the changes
+            // and issuing a PR for it.
+            apiLoad: function() {
+                'use strict';
+
+                this.oldDocumentWrite = document.write;
+
+                // This is a dirty kludge because the Google JSAPI uses
+                // document.write which is unavailable from an asynchronously
+                // loaded script.
+                //
+                // To get around that, I'm temporarily reassigning document.write,
+                // Then reassigning it once the feeds scripts load.
+                //
+                // I know. I'm sorry.
+                document.write = function(stringNode) {
+                    var node = null,
+                        scriptRegex = /<script.*?src="(.*?)"/,
+                        linkRegex = /<link.*?href="(.*?)"/,
+                        srcMatch = scriptRegex.exec(stringNode),
+                        hrefMatch = linkRegex.exec(stringNode);
+
+                    if ( srcMatch ) {
+                        node = document.createElement('script');
+
+                        node.setAttribute('src', srcMatch[1]);
+                        node.setAttribute('type', 'text/javascript');
+
+                        document.body.appendChild(node);
+                    } else if ( hrefMatch ) {
+                        node = document.createElement('link')
+
+                        node.setAttribute('href', hrefMatch[1]);
+                        node.setAttribute('type', 'text/css');
+                        node.setAttribute('rel', 'stylesheet');
+
+                        document.body.appendChild(node);
+                    }
+                };
+
+                // Load the Feeds API and set the callback to
+                // this.feedsLoad. Note that we have to bind
+                // this explicitly here.
+                google.load('feeds', '1');
+                google.setOnLoadCallback(this.feedsLoad.bind(this));
+            },
+
+            // The callback for once the Google Feeds API is loaded.
+            // This is where we finally get to grab any feeds/queries
+            // passed in and call the API.
+            feedsLoad: function() {
+                'use strict';
+
+                try {
+                    if ( typeof(google) === 'undefined' ) {
+                        return;
+                    }
+                } catch ( exception ) {}
+
+                // Reset document.write from the kludge above.
+                document.write = this.oldDocumentWrite;
+
+                // Check if this is a request for a specific feed
+                // or a general query.
+                if ( this.url ) {
+                    this.feed = new google.feeds.Feed(this.url);
+
+                    this.feed.setNumEntries(this.numEntries);
+
+                    if ( this.format === 'xml' ) {
+                        this.feed.setResultFormat(google.feeds.Feed.XML_FORMAT);
+                    } else if ( this.format === 'mixed' ){
+                        this.feed.setResultFormat(google.feeds.Feed.MIXED_FORMAT);
+                    } else {
+                        this.feed.setResultFormat(google.feeds.Feed.JSON_FORMAT);
+                    }
+
+                    if ( this.historicalEntries ){
+                        this.feed.includeHistoricalEntries();
+                    }
+
+                    this.feed.load(this.onFeedResponse.bind(this));
+
+                } else if ( this.query ) {
+                    google.feeds.findFeeds(this.query, this.onQueryResponse.bind(this));
+                }
+            }
+        });
+    </script>
+</polymer-element>
