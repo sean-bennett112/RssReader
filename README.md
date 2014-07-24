@@ -24,6 +24,8 @@ From a feature standpoint:
 - Switching between viewing latest stories and starred stories for feeds
 - Adding a queried feed to your list of feeds
 - Adding support for non-RSS stories, such as social news feeds (Twitter, FB, G+, etc)
+- Add Firebase support for a simple backend, add user auth and saved feeds
+- Add Cordova support, see about compiling to Android/iOS native apps
 
 From an infrastructure perspective
 
