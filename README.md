@@ -5,10 +5,12 @@ This is a simple first attempt at an RSS Reader written in Polymer, mainly becau
 
 To install this, clone the repo, then run
 
-> npm install
-> bower install
-> grunt build
-> grunt serve
+```
+npm install
+bower install
+grunt build
+grunt serve
+```
 
 Still a very early attempt, with lots of things I'd like to eventually add.
 
